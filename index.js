@@ -1,4 +1,4 @@
-var request = require('request').defaults({jar: true/*, proxy:"http://localhost:8888", strictSSL:false*/}); // use cookies
+var request = require('requestretry').defaults({jar: true/*, proxy:"http://localhost:8888", strictSSL:false*/}); // use cookies
 var cheerio = require('cheerio');
 var Service, Characteristic;
 
@@ -12,6 +12,10 @@ module.exports = function(homebridge) {
 var lockOrder = 0;
 var lockEventSpacing = 15000;
 var lockEventsOccurring = 0;
+
+// Additional parameters for requestretry
+var attempts = 10;
+var delay = 50;
 
 function KevoAccessory(log, config) {
   this.log = log;
@@ -62,7 +66,7 @@ KevoAccessory.prototype._login = function(callback) {
     return true; // ok redirect, sure
   }.bind(this);
 
-  request(url, {followRedirect:followRedirect}, function (err, response, body) {
+  request({url:url, followRedirect:followRedirect, maxAttempts:attempts, retryDelay:delay}, function (err, response, body) {
     if (response.statusCode == 302) return; // we cancelled a redirect above
     
     if (!err && response.statusCode == 200 && response.headers['content-type'].indexOf("text/html") == 0) {
@@ -91,10 +95,10 @@ KevoAccessory.prototype._login = function(callback) {
       }
       
       // Submit the login page
-      request.post(action, {form:form}, function(err, response, body) {
+      request.post(url:action, form:form, maxAttempts:attempts, retryDelay:delay}, function(err, response, body) {
         // we expect a redirect response
         if (!err && response.statusCode == 302) {
-          this.log("Login successful.");
+          this.log("Login successful." + response.attempts + "attempts.");
           callback(null);
         }
         else {
@@ -156,10 +160,11 @@ KevoAccessory.prototype._getLockStatus = function(callback) {
   var qs = {
     arguments: this.lockId
   };
-  request(url, {qs:qs}, function(err, response, body) {
+  request({url:url, qs:qs, maxAttempts:attempts, retryDelay:delay}, function(err, response, body) {
 
     if (!err && response.statusCode == 200) {
       var json = JSON.parse(body);
+      this.log("Request attempts: " + request.attempts);
       var state = json.bolt_state; // "Unlocked" or "Locked" or maybe "Processing" or "Confirming"
       callback(null, state);
     }
@@ -191,9 +196,10 @@ KevoAccessory.prototype._setLockStatus = function(status, callback) {
     arguments: this.lockId
   };
   
-  request(url, {qs:qs}, function(err, response, body) {
+  request({url:url, qs:qs, maxAttempts:attempts, retryDelay:delay}, function(err, response, body) {
 
     if (!err && response.statusCode == 200) {
+      this.log("Set attempts: ", response.attempts);
       var json = JSON.parse(body);
       
       if (json.status_code !== 201) {
