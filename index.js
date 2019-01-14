@@ -95,7 +95,7 @@ KevoAccessory.prototype._login = function(callback) {
       }
       
       // Submit the login page
-      request.post(url:action, form:form, maxAttempts:attempts, retryDelay:delay}, function(err, response, body) {
+      request.post({url:action, form:form, maxAttempts:attempts, retryDelay:delay}, function(err, response, body) {
         // we expect a redirect response
         if (!err && response.statusCode == 302) {
           this.log("Login successful." + response.attempts + "attempts.");
